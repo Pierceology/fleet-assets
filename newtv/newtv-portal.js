@@ -257,11 +257,11 @@ class NewTvPortal extends HTMLElement {
         const NETWORKS={
         /* ============ AD TV — subjects, like the TV side ============ */
         addecades:{label:"THE DECADES",accent:"#FFD84D",junk:/\b(movie|film|feature|episode|mtv|concert|music videos?|full)\b/i,maxLen:3900,tick:"TIME TRAVEL BY COMMERCIAL \u2022 1950 TO 1999, ONE SPOT AT A TIME",blurb:"Time-travel by commercial, 1950\u20131999.",channels:[
-          {num:2,call:"50s",name:"THE FIFTIES",type:"query",est:90,q:'adviews AND mediatype:(movies) AND year:[1950 TO 1959]'},
-          {num:3,call:"60s",name:"THE SIXTIES",type:"query",est:90,q:'adviews AND mediatype:(movies) AND year:[1960 TO 1969]'},
-          {num:4,call:"70s",name:"THE SEVENTIES",type:"query",est:90,q:'adviews AND mediatype:(movies) AND year:[1970 TO 1979]'},
-          {num:5,call:"80s",name:"THE EIGHTIES",type:"query",est:90,q:'adviews AND mediatype:(movies) AND year:[1980 TO 1989]'},
-          {num:6,call:"90s",name:"THE NINETIES",type:"query",est:90,q:'title:(commercials) AND mediatype:(movies) AND year:[1990 TO 1999]',not:/\b(50|60|70|80)'?s\b|fifties|sixties|seventies|eighties/i},
+          {num:2,call:"50s",name:"THE FIFTIES",type:"query",est:90,q:'collection:(classic_tv_commercials) AND mediatype:(movies) AND year:[1950 TO 1959]'},
+          {num:3,call:"60s",name:"THE SIXTIES",type:"query",est:90,q:'collection:(classic_tv_commercials) AND mediatype:(movies) AND year:[1960 TO 1969]'},
+          {num:4,call:"70s",name:"THE SEVENTIES",type:"query",est:90,q:'collection:(classic_tv_commercials) AND mediatype:(movies) AND year:[1970 TO 1979]'},
+          {num:5,call:"80s",name:"THE EIGHTIES",type:"query",est:90,q:'collection:(classic_tv_commercials) AND mediatype:(movies) AND year:[1980 TO 1989]'},
+          {num:6,call:"90s",name:"THE NINETIES",type:"query",est:90,q:'collection:(classic_tv_commercials) AND mediatype:(movies) AND year:[1990 TO 1999]',not:/\b(50|60|70|80)'?s\b|fifties|sixties|seventies|eighties/i},
           {num:7,call:"REEL",name:"THE VAULT",type:"items",ids:["ClassicT1948","ClassicT1948_2","ClassicT1948_5","ClassicT1948_6","202275_Television_Commercials_Classic_Comedy","ityppBPDzduiKR0SK2M5qMno72RwAT"]},
           {num:8,call:"CTVC",name:"SPOT CHECK",type:"items",ids:["ctvc"]}
         ]},
