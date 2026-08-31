@@ -220,6 +220,11 @@ const NEWTV_HTML = String.raw`
 <div id="scan"></div>`;
 
 class NewTvPortal extends HTMLElement {
+  disconnectedCallback() {
+    /* Put the site's own favicon back when leaving /newtv. */
+    if (this._faviconRestore) { try { this._faviconRestore(); } catch (e) {} this._faviconRestore = null; }
+  }
+
   connectedCallback() {
     if (this._booted) return;
     this._booted = true;
@@ -875,6 +880,27 @@ async function fetchDocs(q){
         const standalone = window.navigator.standalone === true
           || window.matchMedia('(display-mode: standalone)').matches
           || window.matchMedia('(display-mode: fullscreen)').matches;
+        /* Favicon, scoped to THIS page. The element only exists on /newtv, and
+           Wix is a single-page app -- navigating away does not reload the head,
+           so the original icons are stashed and put back on disconnect.
+           Otherwise the whole J.Noir site would keep wearing a TV set. */
+        this._faviconRestore = (function swapFavicon(){
+          const NEW_ICON = 'https://pierceology.github.io/fleet-assets/newtv/favicon-32.png';
+          const prev = Array.prototype.slice.call(
+            document.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"]'));
+          const stash = prev.map(function(l){ return { el: l, parent: l.parentNode, next: l.nextSibling }; });
+          prev.forEach(function(l){ l.parentNode && l.parentNode.removeChild(l); });
+          const link = document.createElement('link');
+          link.rel = 'icon'; link.type = 'image/png'; link.href = NEW_ICON;
+          document.head.appendChild(link);
+          return function restore(){
+            if (link.parentNode) link.parentNode.removeChild(link);
+            stash.forEach(function(o){
+              if (o.parent) o.parent.insertBefore(o.el, o.next || null);
+            });
+          };
+        })();
+
         (function addHomeScreenMeta(){
           const ICON = 'https://pierceology.github.io/fleet-assets/newtv/icon-180.png';
           const metas = [
