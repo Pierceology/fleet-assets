@@ -443,8 +443,8 @@ class NewTvPortal extends HTMLElement {
           t=t.replace(/\b(512kb|64kb|mp4|h264|ia)\b/gi,'').replace(/\s+/g,' ').trim();
           return (t.length>70?t.slice(0,67)+'…':t)||'Untitled';
         }
-        function cache(key,val){ try{ if(val!==undefined){localStorage.setItem('ntv3_'+key,JSON.stringify({t:Date.now(),v:val}));return val;}
-          const raw=localStorage.getItem('ntv3_'+key); if(!raw)return null;
+        function cache(key,val){ try{ if(val!==undefined){localStorage.setItem('ntv4_'+key,JSON.stringify({t:Date.now(),v:val}));return val;}
+          const raw=localStorage.getItem('ntv4_'+key); if(!raw)return null;
           const o=JSON.parse(raw); return (Date.now()-o.t<6048e5)?o.v:null; }catch(e){return val===undefined?null:val;} }
         const GDATE=new Date().toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
         setInterval(()=>{$id('clock').textContent=fmtS(new Date());},1000);
@@ -555,7 +555,13 @@ class NewTvPortal extends HTMLElement {
            Lesson learned: hammering advancedsearch gets rate-limited and used to
            poison the cache with empty results. Now: one query per network, well
            spaced, empties never cached, and loadChannel retries once. */
-        async function fetchDocs(q){
+        function qkey(q){ /* 40 sanitised chars are NOT unique: five decade queries that
+  differ only in a trailing year range collapse onto one key and every channel
+  then shares one playlist. Keep the readable prefix, append a hash of the FULL
+  query. */
+  let h=0; for(let i=0;i<q.length;i++){ h=(h*31+q.charCodeAt(i))|0; }
+  return 'q_'+q.replace(/\W+/g,'').slice(0,40)+'_'+(h>>>0).toString(36); }
+async function fetchDocs(q){
           const u='https://archive.org/advancedsearch.php?q='+encodeURIComponent(q)
                 +'&fl[]=identifier&fl[]=title&fl[]=year&rows='+QUERY_ROWS+'&page=1&output=json&sort[]=downloads+desc';
           const r=await fetch(u); const j=await r.json();
@@ -565,7 +571,7 @@ class NewTvPortal extends HTMLElement {
           const firsts=[];
           Object.values(NETWORKS).forEach(n=>{const c=(n.channels||[])[0]; if(c&&c.type==='query')firsts.push(c.q);});
           firsts.forEach((q,i)=>setTimeout(async()=>{
-            const key='q_'+q.replace(/\W+/g,'').slice(0,40);
+            const key=qkey(q);
             if(cache(key))return;
             try{const docs=await fetchDocs(q); if(docs.length)cache(key,docs);}catch(e){}
           },1200*(i+1)));
@@ -605,7 +611,7 @@ class NewTvPortal extends HTMLElement {
               if(!ch.playlist.length)throw new Error('empty');
               ch.total=ch.playlist.reduce((s,p)=>s+p.len,0);
             }else{
-              const key='q_'+ch.q.replace(/\W+/g,'').slice(0,40);
+              const key=qkey(ch.q);
               let docs=cache(key);
               if(!docs||!docs.length){
                 docs=await fetchDocs(ch.q);
