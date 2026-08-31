@@ -216,12 +216,6 @@ class NewTvPortal extends HTMLElement {
 
     try {
       {
-        (function(){
-          i.addEventListener('keydown',function(e){if(e.key==='Enter')tryCode();});
-          i.focus();
-        })();
-      }
-      {
         /* =====================================================================
            NEW TV v2 — the portal.
            12 networks, ~70 channels, one broadcast engine, dayparted like real
