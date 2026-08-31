@@ -167,6 +167,42 @@ const NEWTV_CSS = String.raw`
   #rotate .share:after{content:'';position:absolute;left:3.5px;top:-7px;width:2px;height:9px;background:var(--accent);}
   #rotate .sub{font-family:'VT323',monospace;font-size:15px;color:var(--dim);letter-spacing:1px;}
 
+  /* ---------- Cinema layout: phones, tablets, and any short window ----------
+     The old split gave the picture 55% of the height with the guide taking 45%
+     and a control bar under it. On a phone held sideways (about 375px tall)
+     that guaranteed scrolling and left the page showing through underneath.
+     Here the picture fills the whole box, the guide slides up over it only
+     when asked, and the controls float on the video and get out of the way. */
+  #btnGuide{display:none;}
+  @media (max-width:900px), (max-height:600px){
+    :host{height:100svh;min-height:0;}
+    #tv{height:100%;}
+    #screen{position:absolute;inset:0;flex:none;z-index:1;}
+    #guide{position:absolute;left:0;right:0;bottom:0;top:auto;height:64%;z-index:3;flex:none;
+      transform:translateY(101%);transition:transform .24s cubic-bezier(.2,.8,.2,1);
+      border-top:3px solid var(--accent);padding-bottom:54px;}
+    #tv.guideon #guide{transform:translateY(0);}
+    #controls{position:absolute;left:0;right:0;bottom:0;z-index:4;flex:none;height:54px;
+      background:rgba(0,0,0,.66);backdrop-filter:blur(8px);border-top:1px solid rgba(255,216,77,.4);
+      transition:opacity .28s ease,transform .28s ease;}
+    #controls button{background:transparent;font-size:15px;letter-spacing:1.5px;}
+    #btnGuide{display:block;}
+    #btnFull{display:none;}          /* rotating already fills it -- nothing to teach */
+    #tv.guideon #btnGuide{color:#000;background:var(--accent);}
+    /* Idle: the controls and the now-playing strip fade off the picture. */
+    #tv.idle #controls{opacity:0;transform:translateY(100%);pointer-events:none;}
+    #tv.idle #nowbar,#tv.idle #clock,#tv.idle #menuchip{opacity:0;}
+    #nowbar,#clock,#menuchip{transition:opacity .28s ease;}
+    /* Bigger type -- the old sizes were unreadable at arm's length. */
+    #nowbar{font-size:19px;padding:30px 14px 10px;}
+    #clock{font-size:22px;}
+    .ch b{font-size:15px;} .slot i{font-size:17px;} .slot em{font-size:15px;}
+    #ticker{font-size:17px;}
+    #rotate h3{font-size:26px;} #rotate p{font-size:19px;}
+    #rotate .steps{font-size:18px;} #rotate button{font-size:15px;padding:15px 0;}
+    #rotate .sub{font-size:16px;}
+  }
+
 `;
 const NEWTV_HTML = String.raw`
 
@@ -208,6 +244,7 @@ const NEWTV_HTML = String.raw`
     <button id="btnMenu">MENU</button>
     <button id="btnDown">CH −</button>
     <button id="btnUp">CH +</button>
+    <button id="btnGuide">GUIDE</button>
     <button id="btnFull">FULL</button>
     <button id="btnMute">SOUND: ON</button>
   </div>
@@ -228,8 +265,10 @@ const NEWTV_HTML = String.raw`
 
 class NewTvPortal extends HTMLElement {
   disconnectedCallback() {
-    /* Put the site's own favicon back when leaving /newtv. */
+    /* Put the site's own icons back when leaving /newtv -- Wix is a single-page
+       app, so the head is never reloaded on navigation. */
     if (this._faviconRestore) { try { this._faviconRestore(); } catch (e) {} this._faviconRestore = null; }
+    if (window.__ntvTouchRestore) { try { window.__ntvTouchRestore(); } catch (e) {} window.__ntvTouchRestore = null; }
   }
 
   connectedCallback() {
@@ -505,6 +544,7 @@ class NewTvPortal extends HTMLElement {
         paintHero(); setInterval(paintHero,60000);
         
         function showWall(order){
+          if (host.__ntvToTop) host.__ntvToTop();
           toprow.style.display='none'; heroEl.style.display='none';
           subnetsEl.innerHTML=order.map(k=>{
             const n=NETWORKS[k];
@@ -519,6 +559,7 @@ class NewTvPortal extends HTMLElement {
         backBtn.addEventListener('click',()=>{subnetsEl.style.display='none';backBtn.style.display='none';toprow.style.display='flex';heroEl.style.display='flex';});
         
         function enterNetwork(key){
+          if (host.__ntvToTop) host.__ntvToTop();
           NET=NETWORKS[key];
           host.style.setProperty('--accent',NET.accent);
           current=null; tuneToken++;
@@ -577,6 +618,7 @@ class NewTvPortal extends HTMLElement {
           }
         }
         function exitToMenu(){
+          if (host.__ntvToTop) host.__ntvToTop();
           tuneToken++; vid.pause(); vid.removeAttribute('src'); vid.load();
           radiocard.style.display='none'; staticHold(false); statsEl.style.display='none';
           tv.classList.remove('tuned'); tv.style.display='none'; portal.style.display='flex';
@@ -808,6 +850,8 @@ async function fetchDocs(q){
         vid.addEventListener('error',()=>{if(!vid.src)return;const ch=CHANNELS.find(c=>c.num===current); if(ch)advance(ch);});
         
         function tune(num){
+          if (host.__ntvToTop) host.__ntvToTop();
+          if (typeof poke === 'function') poke();
           const ch=CHANNELS.find(c=>c.num===num); if(!ch)return;
           current=num;
           osd.textContent='CH '+String(num).padStart(2,'0')+'  '+ch.call;
@@ -859,6 +903,36 @@ async function fetchDocs(q){
           else { lockLandscape(); }
         }
         $id('btnFull').addEventListener('click', goFull);
+
+        /* GUIDE slides the listings up over the picture; on a phone the guide is
+           no longer permanently eating half the screen. */
+        $id('btnGuide').addEventListener('click', function(){
+          tv.classList.toggle('guideon');
+          poke();
+        });
+
+        /* Controls fade off the picture after a few idle seconds and come back
+           on any touch, move or key -- the way a real player behaves. */
+        let idleTimer = null;
+        function poke(){
+          tv.classList.remove('idle');
+          clearTimeout(idleTimer);
+          idleTimer = setTimeout(function(){
+            if (!tv.classList.contains('guideon')) tv.classList.add('idle');
+          }, 3200);
+        }
+        ['pointerdown','pointermove','touchstart','keydown','wheel'].forEach(function(ev){
+          host.addEventListener(ev, poke, { passive: true });
+        });
+        poke();
+
+        /* Every click used to leave the viewer parked wherever they had scrolled,
+           so the top of the new screen was off-screen. Snap back each time. */
+        function toTop(){
+          try { host.scrollIntoView({ block: 'start' }); } catch (e) {}
+          try { window.scrollTo(0, 0); } catch (e) {}
+        }
+        host.__ntvToTop = toTop;
         ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev){
           document.addEventListener(ev, function(){
             $id('btnFull').textContent = inFullscreen() ? 'EXIT' : 'FULL';
@@ -933,11 +1007,20 @@ async function fetchDocs(q){
             m.name = pair[0]; m.content = pair[1];
             document.head.appendChild(m);
           });
-          if (!document.querySelector('link[rel="apple-touch-icon"]')) {
-            const l = document.createElement('link');
-            l.rel = 'apple-touch-icon'; l.href = ICON;
-            document.head.appendChild(l);
-          }
+          /* Wix ships its own apple-touch-icon, so skipping when one exists meant
+             Add to Home Screen saved a blank Wix favicon instead of the TV.
+             Replace it, and stash the originals to put back on disconnect. */
+          const prevTouch = Array.prototype.slice.call(
+            document.querySelectorAll('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"]'));
+          const touchStash = prevTouch.map(function(l){ return { el:l, parent:l.parentNode, next:l.nextSibling }; });
+          prevTouch.forEach(function(l){ l.parentNode && l.parentNode.removeChild(l); });
+          const touch = document.createElement('link');
+          touch.rel = 'apple-touch-icon'; touch.href = ICON;
+          document.head.appendChild(touch);
+          window.__ntvTouchRestore = function(){
+            if (touch.parentNode) touch.parentNode.removeChild(touch);
+            touchStash.forEach(function(o){ if (o.parent) o.parent.insertBefore(o.el, o.next || null); });
+          };
         })();
         /* One adaptive card, shown once per device. It is NOT a wall -- there is
            always a one-tap way past it. Gating a TV behind an install prompt is

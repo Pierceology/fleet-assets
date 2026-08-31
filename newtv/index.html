@@ -81,6 +81,36 @@
   #rotate .share{display:inline-block;width:13px;height:13px;border:2px solid var(--accent);border-bottom:0;border-radius:3px 3px 0 0;position:relative;vertical-align:-2px;margin:0 2px;}
   #rotate .share:after{content:'';position:absolute;left:3.5px;top:-7px;width:2px;height:9px;background:var(--accent);}
   #rotate .sub{font-family:'VT323',monospace;font-size:15px;color:var(--dim);letter-spacing:1px;}
+
+  /* Cinema layout -- see newtv-portal.js for the reasoning. The picture fills
+     the box, the guide slides up over it, the controls float and auto-hide. */
+  #btnGuide{display:none;}
+  @media (max-width:900px), (max-height:600px){
+    html,body{height:100%;overflow:hidden;background:var(--void);}
+    #tv{height:100svh;}
+    #screen{position:absolute;inset:0;flex:none;z-index:1;}
+    #guide{position:absolute;left:0;right:0;bottom:0;top:auto;height:64%;z-index:3;flex:none;
+      transform:translateY(101%);transition:transform .24s cubic-bezier(.2,.8,.2,1);
+      border-top:3px solid var(--accent);padding-bottom:54px;}
+    #tv.guideon #guide{transform:translateY(0);}
+    #controls{position:absolute;left:0;right:0;bottom:0;z-index:4;flex:none;height:54px;
+      background:rgba(0,0,0,.66);backdrop-filter:blur(8px);border-top:1px solid rgba(255,216,77,.4);
+      transition:opacity .28s ease,transform .28s ease;}
+    #controls button{background:transparent;font-size:15px;letter-spacing:1.5px;}
+    #btnGuide{display:block;}
+    #btnFull{display:none;}
+    #tv.guideon #btnGuide{color:#000;background:var(--accent);}
+    #tv.idle #controls{opacity:0;transform:translateY(100%);pointer-events:none;}
+    #tv.idle #nowbar,#tv.idle #clock,#tv.idle #menuchip{opacity:0;}
+    #nowbar,#clock,#menuchip{transition:opacity .28s ease;}
+    #nowbar{font-size:19px;padding:30px 14px 10px;}
+    #clock{font-size:22px;}
+    .ch b{font-size:15px;} .slot i{font-size:17px;} .slot em{font-size:15px;}
+    #ticker{font-size:17px;}
+    #rotate h3{font-size:26px;} #rotate p{font-size:19px;}
+    #rotate .steps{font-size:18px;} #rotate button{font-size:15px;padding:15px 0;}
+    #rotate .sub{font-size:16px;}
+  }
   #sponsorbar{display:none;font-family:'VT323',monospace;font-size:17px;color:var(--dim);letter-spacing:1px;text-align:center;}/* Hidden for the friends-and-family broadcast: there is nothing to sell yet, and 'sponsor a channel' pulls attention off the only question that matters right now, which is whether the TV is any good. Delete this display:none to switch the whole sponsor system back on -- the code behind it is untouched. */
   #sponsorbar a{color:var(--accent);text-decoration:none;}
   #sponsorbar a:hover{text-decoration:underline;}
@@ -195,6 +225,7 @@
     <button id="btnMenu">MENU</button>
     <button id="btnDown">CH −</button>
     <button id="btnUp">CH +</button>
+    <button id="btnGuide">GUIDE</button>
     <button id="btnFull">FULL</button>
     <button id="btnMute">SOUND: ON</button>
   </div>
@@ -805,6 +836,24 @@ function goFull(){
   else { lockLandscape(); }
 }
 document.getElementById('btnFull').addEventListener('click', goFull);
+
+/* GUIDE slides the listings up over the picture. */
+document.getElementById('btnGuide').addEventListener('click', function(){
+  tv.classList.toggle('guideon'); poke();
+});
+/* Controls fade off the picture when idle, return on any activity. */
+let idleTimer = null;
+function poke(){
+  tv.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(function(){
+    if (!tv.classList.contains('guideon')) tv.classList.add('idle');
+  }, 3200);
+}
+['pointerdown','pointermove','touchstart','keydown','wheel'].forEach(function(ev){
+  document.addEventListener(ev, poke, { passive: true });
+});
+poke();
 ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev){
   document.addEventListener(ev, function(){
     document.getElementById('btnFull').textContent = inFullscreen() ? 'EXIT' : 'FULL';
