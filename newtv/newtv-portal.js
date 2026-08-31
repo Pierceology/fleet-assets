@@ -71,7 +71,7 @@ const NEWTV_CSS = String.raw`
     padding:6px 18px;border-radius:8px;cursor:pointer;letter-spacing:2px;}
   #back:hover{color:var(--text);border-color:var(--dim);}
 
-  #sponsorbar{font-family:'VT323',monospace;font-size:17px;color:var(--dim);letter-spacing:1px;text-align:center;}
+  #sponsorbar{display:none;font-family:'VT323',monospace;font-size:17px;color:var(--dim);letter-spacing:1px;text-align:center;}/* Hidden for the friends-and-family broadcast: there is nothing to sell yet, and 'sponsor a channel' pulls attention off the only question that matters right now, which is whether the TV is any good. Delete this display:none to switch the whole sponsor system back on -- the code behind it is untouched. */
   #sponsorbar a{color:var(--accent);text-decoration:none;}
   #sponsorbar a:hover{text-decoration:underline;}
 
