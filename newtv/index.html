@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
 <title>NEW TV — Free TV. Forever.</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Barlow+Condensed:wght@500;700&family=VT323&display=swap" rel="stylesheet">
 <style>
@@ -124,22 +125,7 @@
 </style>
 </head>
 <body>
-<div id="gate" style="position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#05060A;padding:24px 16px;text-align:center;">
-  <div style="font-family:'Orbitron',sans-serif;font-weight:800;font-size:clamp(24px,7vw,34px);letter-spacing:clamp(4px,1.6vw,8px);color:#EDEFF5;">NEW&nbsp;TV</div>
-  <div style="font-family:'VT323',monospace;font-size:clamp(13px,3.4vw,18px);color:#8B93A7;letter-spacing:clamp(1px,.7vw,3px);max-width:100%;">PRIVATE TEST BROADCAST — ENTER PASSCODE</div>
-  <input id="gatecode" type="text" name="newtv-passcode" inputmode="text" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" style="background:#0C0E16;border:1px solid #1B1F2E;color:#EDEFF5;font-family:'VT323',monospace;font-size:26px;letter-spacing:8px;padding:12px 16px;border-radius:8px;text-align:center;width:min(260px,72vw);" />
-  <button id="gatego" style="background:#FFD84D;color:#000;border:0;font-family:'Orbitron',sans-serif;font-size:15px;letter-spacing:3px;padding:10px 26px;border-radius:8px;cursor:pointer;">TUNE IN</button>
-</div>
-<script>
-(function(){
-  var CODE="GRAVY";
-  var g=document.getElementById('gate'),i=document.getElementById('gatecode');
-  function tryCode(){ if(i.value.trim().toUpperCase()===CODE){ g.remove(); } else { i.value=''; i.placeholder='NO SIGNAL'; } }
-  document.getElementById('gatego').addEventListener('click',tryCode);
-  i.addEventListener('keydown',function(e){if(e.key==='Enter')tryCode();});
-  i.focus();
-})();
-</script>
+
 
 
 <!-- ================= PORTAL ================= -->

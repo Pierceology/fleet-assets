@@ -144,12 +144,7 @@ const NEWTV_CSS = String.raw`
     #osd{font-size:18px;} #clock{font-size:21px;} #nowbar{font-size:15px;}
   }
 `;
-const NEWTV_HTML = String.raw`<div id="gate" style="position:absolute;inset:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#05060A;">
-  <div style="font-family:'Orbitron',sans-serif;font-weight:800;font-size:34px;letter-spacing:8px;color:#EDEFF5;">NEW&nbsp;TV</div>
-  <div style="font-family:'VT323',monospace;font-size:18px;color:#8B93A7;letter-spacing:3px;">PRIVATE TEST BROADCAST — ENTER PASSCODE</div>
-  <input id="gatecode" type="password" autocomplete="off" style="background:#0C0E16;border:1px solid #1B1F2E;color:#EDEFF5;font-family:'VT323',monospace;font-size:26px;letter-spacing:8px;padding:10px 16px;border-radius:8px;text-align:center;width:220px;" />
-  <button id="gatego" style="background:#FFD84D;color:#000;border:0;font-family:'Orbitron',sans-serif;font-size:15px;letter-spacing:3px;padding:10px 26px;border-radius:8px;cursor:pointer;">TUNE IN</button>
-</div>
+const NEWTV_HTML = String.raw`
 
 
 
@@ -222,10 +217,6 @@ class NewTvPortal extends HTMLElement {
     try {
       {
         (function(){
-          var CODE="GRAVY";
-          var g=$id('gate'),i=$id('gatecode');
-          function tryCode(){ if(i.value.trim().toUpperCase()===CODE){ g.remove(); } else { i.value=''; i.placeholder='NO SIGNAL'; } }
-          $id('gatego').addEventListener('click',tryCode);
           i.addEventListener('keydown',function(e){if(e.key==='Enter')tryCode();});
           i.focus();
         })();
