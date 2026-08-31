@@ -160,6 +160,12 @@ const NEWTV_CSS = String.raw`
   #rotate .skip{background:transparent;color:var(--dim);border-color:var(--line);}
   #rotate .ios{font-family:'VT323',monospace;font-size:15px;color:var(--dim);max-width:32ch;line-height:1.5;}
   #rotate .ios b{color:var(--accent);font-weight:400;}
+  #rotate .steps{font-family:'VT323',monospace;font-size:16px;color:var(--dim);line-height:1.7;text-align:left;max-width:32ch;}
+  #rotate .steps b{color:var(--text);font-weight:400;}
+  #rotate .share{display:inline-block;width:13px;height:13px;border:2px solid var(--accent);border-bottom:0;
+    border-radius:3px 3px 0 0;position:relative;vertical-align:-2px;margin:0 2px;}
+  #rotate .share:after{content:'';position:absolute;left:3.5px;top:-7px;width:2px;height:9px;background:var(--accent);}
+  #rotate .sub{font-family:'VT323',monospace;font-size:15px;color:var(--dim);letter-spacing:1px;}
 
 `;
 const NEWTV_HTML = String.raw`
@@ -208,13 +214,14 @@ const NEWTV_HTML = String.raw`
 </div>
 <div id="rotate">
   <div class="phone"></div>
-  <h3>TURN YOUR PHONE</h3>
-  <p>NEW TV is a widescreen. Rotate for the full picture.</p>
+  <h3 id="rotTitle">TURN YOUR PHONE</h3>
+  <p id="rotBody">NEW TV is a widescreen. Rotate for the full picture.</p>
+  <div class="steps" id="rotSteps" hidden></div>
   <div class="btns">
     <button class="go" id="rotFull">GO FULLSCREEN</button>
     <button class="skip" id="rotSkip">WATCH ANYWAY</button>
   </div>
-  <div class="ios" id="iosTip"></div>
+  <div class="sub" id="rotSub"></div>
 </div>
 <div id="stats"></div>
 <div id="scan"></div>`;
@@ -862,15 +869,25 @@ async function fetchDocs(q){
         /* Small screen held upright only, and dismissible -- a wall nobody can
            get past is worse than a narrow picture. */
         let rotDismissed = false;
+        try { rotDismissed = localStorage.getItem('ntv4_introSeen') === '1'; } catch (e) {}
         function checkRotate(){
           const el = $id('rotate'); if (!el) return;
-          const small = Math.min(window.innerWidth, window.innerHeight) <= 500;
+          const short = Math.min(window.innerWidth, window.innerHeight);
           const portrait = window.innerHeight > window.innerWidth;
-          el.classList.toggle('on', small && portrait && !rotDismissed);
+          /* Phones and tablets get the install card in any orientation, because
+             on iOS the bars stay whichever way you hold it. Everyone else only
+             sees the rotate nudge, and only when actually held upright. */
+          const wants = (isIOS || androidPrompt) ? (short <= 900) : (short <= 500 && portrait);
+          el.classList.toggle('on', wants && !standalone && !rotDismissed);
         }
-        $id('rotSkip').addEventListener('click', function(){ rotDismissed = true; checkRotate(); });
-        /* A real user gesture, so fullscreen is permitted from this handler. */
-        $id('rotFull').addEventListener('click', function(){ rotDismissed = true; checkRotate(); goFull(); });
+        $id('rotSkip').addEventListener('click', dismissCard);
+        /* A real user gesture, so both fullscreen and the install prompt are
+           permitted from this handler. */
+        $id('rotFull').addEventListener('click', function(){
+          if (androidPrompt) { androidPrompt.prompt(); androidPrompt = null; dismissCard(); return; }
+          dismissCard();
+          if (!isIOS) { goFull(); }
+        });
         /* iPhone refuses element fullscreen entirely, so point at the one route
            that does work: Add to Home Screen launches without Safari's chrome.
            The meta tags have to be injected here -- this element does not own
@@ -922,12 +939,51 @@ async function fetchDocs(q){
             document.head.appendChild(l);
           }
         })();
-        if (!fsSupported || isIOS) { $id('rotFull').textContent = 'WATCH WIDE'; }
-        if (isIOS && !standalone) {
-          $id('iosTip').innerHTML =
-            'For true fullscreen on iPhone: tap <b>Share</b>, then <b>Add to Home Screen</b>, and open NEW TV from there.';
+        /* One adaptive card, shown once per device. It is NOT a wall -- there is
+           always a one-tap way past it. Gating a TV behind an install prompt is
+           the surest way to lose someone who just tapped a friend's link.
+           On iOS it leads with Add to Home Screen because rotating does NOT
+           remove Safari's bars -- installing is the only thing that does. */
+        const SEEN_KEY = 'ntv4_introSeen';
+        let androidPrompt = null;
+        window.addEventListener('beforeinstallprompt', function(e){
+          e.preventDefault(); androidPrompt = e; paintCard();
+        });
+
+        function paintCard(){
+          const small = Math.min(window.innerWidth, window.innerHeight) <= 900;
+          if (!small || standalone) return;
+          const portrait = window.innerHeight > window.innerWidth;
+          if (isIOS) {
+            $id('rotTitle').textContent = 'WATCH IT PROPERLY';
+            $id('rotBody').textContent = 'Add NEW TV to your Home Screen. It opens with no browser bars \u2014 the whole screen, like a real set.';
+            $id('rotSteps').hidden = false;
+            $id('rotSteps').innerHTML =
+              '1. Tap <b>Share</b> <span class="share"></span> at the bottom<br>' +
+              '2. Scroll and tap <b>Add to Home Screen</b><br>' +
+              '3. Open NEW TV from your Home Screen';
+            $id('rotFull').textContent = 'GOT IT \u2014 WATCH NOW';
+            $id('rotSub').textContent = portrait ? 'Tip: turn the phone sideways too.' : '';
+          } else if (androidPrompt) {
+            $id('rotTitle').textContent = 'WATCH IT PROPERLY';
+            $id('rotBody').textContent = 'Install NEW TV for the whole screen, no browser bars.';
+            $id('rotFull').textContent = 'INSTALL NEW TV';
+            $id('rotSub').textContent = portrait ? 'Or just turn the phone sideways.' : '';
+          } else {
+            $id('rotTitle').textContent = 'TURN YOUR PHONE';
+            $id('rotBody').textContent = 'NEW TV is a widescreen. Rotate for the full picture.';
+            $id('rotFull').textContent = fsSupported ? 'GO FULLSCREEN' : 'WATCH WIDE';
+            $id('rotSub').textContent = '';
+          }
         }
-        ['resize','orientationchange'].forEach(function(ev){ window.addEventListener(ev, checkRotate); });
+
+        function dismissCard(){
+          rotDismissed = true;
+          try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) {}
+          checkRotate();
+        }
+        ['resize','orientationchange'].forEach(function(ev){ window.addEventListener(ev, function(){ paintCard(); checkRotate(); }); });
+        paintCard();
         checkRotate();
         $id('btnMute').addEventListener('click',e=>{
           vid.muted=!vid.muted; e.target.textContent='SOUND: '+(vid.muted?'OFF':'ON');});

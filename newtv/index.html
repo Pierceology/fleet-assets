@@ -76,6 +76,11 @@
   #rotate .skip{background:transparent;color:var(--dim);border-color:var(--line);}
   #rotate .ios{font-family:'VT323',monospace;font-size:15px;color:var(--dim);max-width:32ch;line-height:1.5;}
   #rotate .ios b{color:var(--accent);font-weight:400;}
+  #rotate .steps{font-family:'VT323',monospace;font-size:16px;color:var(--dim);line-height:1.7;text-align:left;max-width:32ch;}
+  #rotate .steps b{color:var(--text);font-weight:400;}
+  #rotate .share{display:inline-block;width:13px;height:13px;border:2px solid var(--accent);border-bottom:0;border-radius:3px 3px 0 0;position:relative;vertical-align:-2px;margin:0 2px;}
+  #rotate .share:after{content:'';position:absolute;left:3.5px;top:-7px;width:2px;height:9px;background:var(--accent);}
+  #rotate .sub{font-family:'VT323',monospace;font-size:15px;color:var(--dim);letter-spacing:1px;}
   #sponsorbar{display:none;font-family:'VT323',monospace;font-size:17px;color:var(--dim);letter-spacing:1px;text-align:center;}/* Hidden for the friends-and-family broadcast: there is nothing to sell yet, and 'sponsor a channel' pulls attention off the only question that matters right now, which is whether the TV is any good. Delete this display:none to switch the whole sponsor system back on -- the code behind it is untouched. */
   #sponsorbar a{color:var(--accent);text-decoration:none;}
   #sponsorbar a:hover{text-decoration:underline;}
@@ -196,13 +201,14 @@
 </div>
 <div id="rotate">
   <div class="phone"></div>
-  <h3>TURN YOUR PHONE</h3>
-  <p>NEW TV is a widescreen. Rotate for the full picture.</p>
+  <h3 id="rotTitle">TURN YOUR PHONE</h3>
+  <p id="rotBody">NEW TV is a widescreen. Rotate for the full picture.</p>
+  <div class="steps" id="rotSteps" hidden></div>
   <div class="btns">
     <button class="go" id="rotFull">GO FULLSCREEN</button>
     <button class="skip" id="rotSkip">WATCH ANYWAY</button>
   </div>
-  <div class="ios" id="iosTip"></div>
+  <div class="sub" id="rotSub"></div>
 </div>
 <div id="stats"></div>
 <div id="scan"></div>
@@ -806,24 +812,56 @@ document.getElementById('btnFull').addEventListener('click', goFull);
   });
 });
 
-/* Small screen held upright only, and dismissible. */
-let rotDismissed = false;
-function checkRotate(){
-  const el = document.getElementById('rotate'); if (!el) return;
-  const small = Math.min(window.innerWidth, window.innerHeight) <= 500;
+/* One adaptive card, shown once per device, never a wall -- there is always a
+   one-tap way past it. On iOS it leads with Add to Home Screen, because
+   rotating does NOT remove Safari's bars; installing is the only thing that
+   does. */
+const $g = function(id){ return document.getElementById(id); };
+const SEEN_KEY = 'ntv4_introSeen';
+let androidPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); androidPrompt = e; paintCard(); });
+
+function paintCard(){
+  const small = Math.min(window.innerWidth, window.innerHeight) <= 900;
+  if (!small || standalone) return;
   const portrait = window.innerHeight > window.innerWidth;
-  el.classList.toggle('on', small && portrait && !rotDismissed);
+  if (isIOS) {
+    $g('rotTitle').textContent = 'WATCH IT PROPERLY';
+    $g('rotBody').textContent = 'Add NEW TV to your Home Screen. It opens with no browser bars \u2014 the whole screen, like a real set.';
+    $g('rotSteps').hidden = false;
+    $g('rotSteps').innerHTML = '1. Tap <b>Share</b> <span class="share"></span> at the bottom<br>2. Scroll and tap <b>Add to Home Screen</b><br>3. Open NEW TV from your Home Screen';
+    $g('rotFull').textContent = 'GOT IT \u2014 WATCH NOW';
+    $g('rotSub').textContent = portrait ? 'Tip: turn the phone sideways too.' : '';
+  } else if (androidPrompt) {
+    $g('rotTitle').textContent = 'WATCH IT PROPERLY';
+    $g('rotBody').textContent = 'Install NEW TV for the whole screen, no browser bars.';
+    $g('rotFull').textContent = 'INSTALL NEW TV';
+    $g('rotSub').textContent = portrait ? 'Or just turn the phone sideways.' : '';
+  } else {
+    $g('rotTitle').textContent = 'TURN YOUR PHONE';
+    $g('rotBody').textContent = 'NEW TV is a widescreen. Rotate for the full picture.';
+    $g('rotFull').textContent = fsSupported ? 'GO FULLSCREEN' : 'WATCH WIDE';
+    $g('rotSub').textContent = '';
+  }
 }
-document.getElementById('rotSkip').addEventListener('click', function(){ rotDismissed = true; checkRotate(); });
-document.getElementById('rotFull').addEventListener('click', function(){ rotDismissed = true; checkRotate(); goFull(); });
-/* iPhone can't do element fullscreen at all, so point at the one thing that
-   does work there: Add to Home Screen launches without Safari's chrome. */
-if (isIOS && !standalone) {
-  document.getElementById('rotFull').textContent = 'WATCH WIDE';
-  document.getElementById('iosTip').innerHTML =
-    'For true fullscreen on iPhone: tap <b>Share</b>, then <b>Add to Home Screen</b>, and open NEW TV from there.';
+let rotDismissed = false;
+try { rotDismissed = localStorage.getItem(SEEN_KEY) === '1'; } catch (e) {}
+function dismissCard(){ rotDismissed = true; try { localStorage.setItem(SEEN_KEY,'1'); } catch(e){} checkRotate(); }
+function checkRotate(){
+  const el = $g('rotate'); if (!el) return;
+  const short = Math.min(window.innerWidth, window.innerHeight);
+  const portrait = window.innerHeight > window.innerWidth;
+  const wants = (isIOS || androidPrompt) ? (short <= 900) : (short <= 500 && portrait);
+  el.classList.toggle('on', wants && !standalone && !rotDismissed);
 }
-['resize','orientationchange'].forEach(function(ev){ window.addEventListener(ev, checkRotate); });
+$g('rotSkip').addEventListener('click', dismissCard);
+$g('rotFull').addEventListener('click', function(){
+  if (androidPrompt) { androidPrompt.prompt(); androidPrompt = null; dismissCard(); return; }
+  dismissCard();
+  if (!isIOS) { goFull(); }
+});
+['resize','orientationchange'].forEach(function(ev){ window.addEventListener(ev, function(){ paintCard(); checkRotate(); }); });
+paintCard();
 checkRotate();
 document.getElementById('btnMute').addEventListener('click',e=>{
   vid.muted=!vid.muted; e.target.textContent='SOUND: '+(vid.muted?'OFF':'ON');});
