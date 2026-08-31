@@ -187,6 +187,7 @@ const NEWTV_CSS = String.raw`
       transition:opacity .28s ease,transform .28s ease;}
     #controls button{background:transparent;font-size:15px;letter-spacing:1.5px;}
     #btnGuide{display:block;}
+    #btnReload{flex:0 0 46px;font-size:19px;letter-spacing:0;}
     #btnFull{display:none;}          /* rotating already fills it -- nothing to teach */
     #tv.guideon #btnGuide{color:#000;background:var(--accent);}
     /* Idle: the controls and the now-playing strip fade off the picture. */
@@ -211,7 +212,7 @@ const NEWTV_HTML = String.raw`
 <!-- ================= PORTAL ================= -->
 <div id="portal">
   <div class="brand">NEW&nbsp;TV</div>
-  <div class="tag">FREE TV. FOREVER. THE DIAL KNOWS WHAT TIME IT IS.</div>
+  <div class="tag">FREE TV. FOREVER.</div>
   <button id="hero"></button>
   <div class="row" id="toprow">
     <button class="megabtn ad" data-pick="adtv"><h2>AD TV</h2><p>All commercials. By decade, subject, product, and brand.</p></button>
@@ -245,6 +246,7 @@ const NEWTV_HTML = String.raw`
     <button id="btnDown">CH −</button>
     <button id="btnUp">CH +</button>
     <button id="btnGuide">GUIDE</button>
+    <button id="btnReload" title="Get the latest version">↻</button>
     <button id="btnFull">FULL</button>
     <button id="btnMute">SOUND: ON</button>
   </div>
@@ -477,13 +479,13 @@ class NewTvPortal extends HTMLElement {
         const SUBNET_ORDER=["crime","west","toons","scifi","midnight","comedy","jukebox","history","school","weird","movies"];
         const QUERY_ROWS=150, MAX_BRAND_CHANNELS=40;
         
-        /* ---------- DAYPARTS: the dial knows what time it is ---------- */
+        /* ---------- DAYPARTS: what is on depends on the hour ---------- */
         function daypart(){
           const d=new Date(), day=d.getDay(), h=d.getHours(); // 0=Sun 6=Sat
           if(day===6&&h>=6&&h<12) return {net:"toons",label:"IT'S SATURDAY MORNING",blurb:"Cartoons are live. Cereal not included."};
           if(day===0&&h>=6&&h<12) return {net:"west",label:"SUNDAY WESTERNS",blurb:"Coffee, quiet, and the Lone Ranger."};
           if(h>=6&&h<9)   return {net:"history",label:"THE MORNING NEWSREEL",blurb:"Start the day in black and white."};
-          if(h>=9&&h<15)  return {net:"addecades",label:"DAYTIME SPOT BLOCK",blurb:"Commercials on in the background. Mesmerizing."};
+          if(h>=9&&h<15)  return {net:"comedy",label:"DAYTIME RERUNS",blurb:"Old sitcoms, on in the background."};
           if(h>=15&&h<18) return {net:"school",label:"AFTER SCHOOL SPECIAL",blurb:"Civics, art class, and how not to behave."};
           if(h>=18&&h<20) return {net:"comedy",label:"DINNERTIME COMEDY",blurb:"Laugh track with your leftovers."};
           if(h>=20&&h<23) return {net:"crime",label:"PRIME TIME CRIME",blurb:"Noir hours. Lock the doors."};
@@ -906,6 +908,19 @@ async function fetchDocs(q){
 
         /* GUIDE slides the listings up over the picture; on a phone the guide is
            no longer permanently eating half the screen. */
+        /* An installed app has no browser chrome, so a viewer has no way to pull
+           a newer build. This button does, and the check below does it for them:
+           on returning to the app after a while, re-fetch so they are not stuck
+           on whatever shipped the day they added it. */
+        $id('btnReload').addEventListener('click', function(){
+          try { location.reload(); } catch (e) {}
+        });
+        let lastActive = Date.now();
+        document.addEventListener('visibilitychange', function(){
+          if (document.visibilityState === 'hidden') { lastActive = Date.now(); return; }
+          if (Date.now() - lastActive > 1800000) { try { location.reload(); } catch (e) {} }
+        });
+
         $id('btnGuide').addEventListener('click', function(){
           tv.classList.toggle('guideon');
           poke();
