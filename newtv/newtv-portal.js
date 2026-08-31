@@ -33,7 +33,7 @@ const NEWTV_CSS = String.raw`
     --accent:#FFD84D; --text:#EDEFF5; --dim:#8B93A7;
   }
   *{margin:0;padding:0;box-sizing:border-box;}
-  :host{display:block;position:relative;width:100%;height:100%;min-height:520px;overflow:hidden;background:var(--void);color:var(--text);font-family:'Barlow Condensed',Arial,sans-serif;}
+  :host{display:block;position:relative;width:100%;height:100%;min-height:100vh;min-height:100svh;overflow:hidden;background:var(--void);color:var(--text);font-family:'Barlow Condensed',Arial,sans-serif;}
 
   /* ================= PORTAL ================= */
   #portal{position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;overflow:auto;padding:24px 12px;background:
@@ -71,7 +71,7 @@ const NEWTV_CSS = String.raw`
     padding:6px 18px;border-radius:8px;cursor:pointer;letter-spacing:2px;}
   #back:hover{color:var(--text);border-color:var(--dim);}
 
-  #sponsorbar{display:none;font-family:'VT323',monospace;font-size:17px;color:var(--dim);letter-spacing:1px;text-align:center;}/* Hidden for the friends-and-family broadcast: there is nothing to sell yet, and 'sponsor a channel' pulls attention off the only question that matters right now, which is whether the TV is any good. Delete this display:none to switch the whole sponsor system back on -- the code behind it is untouched. */
+  #sponsorbar{display:none;font-family:'VT323',monospace;font-size:17px;color:var(--dim);letter-spacing:1px;text-align:center;}
   #sponsorbar a{color:var(--accent);text-decoration:none;}
   #sponsorbar a:hover{text-decoration:underline;}
 
@@ -143,6 +143,24 @@ const NEWTV_CSS = String.raw`
     .ch b{font-size:12px;} .slot i{font-size:15px;}
     #osd{font-size:18px;} #clock{font-size:21px;} #nowbar{font-size:15px;}
   }
+  /* Turn-your-phone prompt. Only ever shown on a small screen held upright. */
+  #rotate{position:fixed;inset:0;z-index:10000;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:22px;background:var(--void);color:var(--text);text-align:center;padding:34px;}
+  #rotate.on{display:flex;}
+  #rotate .phone{width:66px;height:108px;border:3px solid var(--accent);border-radius:12px;flex:none;
+    animation:ntvtilt 2s ease-in-out infinite;}
+  @keyframes ntvtilt{0%,50%{transform:rotate(0deg)}70%,100%{transform:rotate(-90deg)}}
+  @media (prefers-reduced-motion:reduce){#rotate .phone{animation:none;transform:rotate(-90deg)}}
+  #rotate h3{font-family:'Orbitron',sans-serif;font-size:clamp(17px,5.2vw,24px);letter-spacing:3px;margin:0;}
+  #rotate p{font-family:'VT323',monospace;font-size:17px;letter-spacing:1px;color:var(--dim);margin:0;max-width:30ch;}
+  #rotate .btns{display:flex;flex-direction:column;gap:10px;width:min(280px,80vw);}
+  #rotate button{font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:2px;padding:13px 0;
+    border-radius:999px;cursor:pointer;border:2px solid var(--accent);}
+  #rotate .go{background:var(--accent);color:#000;}
+  #rotate .skip{background:transparent;color:var(--dim);border-color:var(--line);}
+  #rotate .ios{font-family:'VT323',monospace;font-size:15px;color:var(--dim);max-width:32ch;line-height:1.5;}
+  #rotate .ios b{color:var(--accent);font-weight:400;}
+
 `;
 const NEWTV_HTML = String.raw`
 
@@ -188,6 +206,16 @@ const NEWTV_HTML = String.raw`
     <button id="btnMute">SOUND: ON</button>
   </div>
 </div>
+<div id="rotate">
+  <div class="phone"></div>
+  <h3>TURN YOUR PHONE</h3>
+  <p>NEW TV is a widescreen. Rotate for the full picture.</p>
+  <div class="btns">
+    <button class="go" id="rotFull">GO FULLSCREEN</button>
+    <button class="skip" id="rotSkip">WATCH ANYWAY</button>
+  </div>
+  <div class="ios" id="iosTip"></div>
+</div>
 <div id="stats"></div>
 <div id="scan"></div>`;
 
@@ -195,6 +223,14 @@ class NewTvPortal extends HTMLElement {
   connectedCallback() {
     if (this._booted) return;
     this._booted = true;
+    /* Wix puts min-height:100% on the component from its own stylesheet, and a
+       document-level rule beats :host -- so the host computed to height 0 and
+       the whole portal collapsed to an invisible strip (found live 2026-08-31).
+       Inline + !important is the only thing that outranks it. */
+    this.style.setProperty('display', 'block', 'important');
+    this.style.setProperty('width', '100%', 'important');
+    this.style.setProperty('height', '100%', 'important');
+    this.style.setProperty('min-height', '100svh', 'important');
     ensureFonts();
     const root = this.attachShadow({ mode: 'open' });
     root.innerHTML = '<style>' + NEWTV_CSS + '</style>' + NEWTV_HTML;
@@ -540,10 +576,9 @@ class NewTvPortal extends HTMLElement {
            Lesson learned: hammering advancedsearch gets rate-limited and used to
            poison the cache with empty results. Now: one query per network, well
            spaced, empties never cached, and loadChannel retries once. */
-        function qkey(q){ /* 40 sanitised chars are NOT unique: five decade queries that
-  differ only in a trailing year range collapse onto one key and every channel
-  then shares one playlist. Keep the readable prefix, append a hash of the FULL
-  query. */
+        function qkey(q){ /* 40 sanitised chars are NOT unique: the decade queries differ
+  only in a trailing year range, so they collapsed onto one key and every
+  channel shared one playlist. Hash the FULL query. */
   let h=0; for(let i=0;i<q.length;i++){ h=(h*31+q.charCodeAt(i))|0; }
   return 'q_'+q.replace(/\W+/g,'').slice(0,40)+'_'+(h>>>0).toString(36); }
 async function fetchDocs(q){
@@ -785,7 +820,89 @@ async function fetchDocs(q){
         $id('btnMenu').addEventListener('click',exitToMenu);
         $id('btnUp').addEventListener('click',()=>step(1));
         $id('btnDown').addEventListener('click',()=>step(-1));
-        $id('btnFull').addEventListener('click',()=>tv.classList.toggle('tuned'));
+        /* FULL used to only collapse the guide -- it never left the browser, which
+           is why Chrome's tabs stayed on screen. It now asks for real fullscreen
+           on the host and locks landscape where the platform allows it. iOS
+           Safari refuses element fullscreen outright (video only), so there we
+           fall back to the guide-collapse, which is the most screen an iPhone
+           will actually give us. */
+        const fsSupported = !!(host.requestFullscreen || host.webkitRequestFullscreen);
+        function inFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+        function lockLandscape(){
+          try {
+            if (screen.orientation && screen.orientation.lock) {
+              screen.orientation.lock('landscape').catch(function(){});
+            }
+          } catch (e) {}
+        }
+        function goFull(){
+          if (inFullscreen()) {
+            (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+            return;
+          }
+          const req = host.requestFullscreen || host.webkitRequestFullscreen;
+          if (!req) { tv.classList.toggle('tuned'); return; }
+          const r = req.call(host);
+          if (r && r.then) { r.then(lockLandscape).catch(function(){ tv.classList.add('tuned'); }); }
+          else { lockLandscape(); }
+        }
+        $id('btnFull').addEventListener('click', goFull);
+        ['fullscreenchange','webkitfullscreenchange'].forEach(function(ev){
+          document.addEventListener(ev, function(){
+            $id('btnFull').textContent = inFullscreen() ? 'EXIT' : 'FULL';
+            checkRotate();
+          });
+        });
+
+        /* Small screen held upright only, and dismissible -- a wall nobody can
+           get past is worse than a narrow picture. */
+        let rotDismissed = false;
+        function checkRotate(){
+          const el = $id('rotate'); if (!el) return;
+          const small = Math.min(window.innerWidth, window.innerHeight) <= 500;
+          const portrait = window.innerHeight > window.innerWidth;
+          el.classList.toggle('on', small && portrait && !rotDismissed);
+        }
+        $id('rotSkip').addEventListener('click', function(){ rotDismissed = true; checkRotate(); });
+        /* A real user gesture, so fullscreen is permitted from this handler. */
+        $id('rotFull').addEventListener('click', function(){ rotDismissed = true; checkRotate(); goFull(); });
+        /* iPhone refuses element fullscreen entirely, so point at the one route
+           that does work: Add to Home Screen launches without Safari's chrome.
+           The meta tags have to be injected here -- this element does not own
+           the Wix page head, and iOS reads them when the user adds the page. */
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+          || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const standalone = window.navigator.standalone === true
+          || window.matchMedia('(display-mode: standalone)').matches
+          || window.matchMedia('(display-mode: fullscreen)').matches;
+        (function addHomeScreenMeta(){
+          const ICON = 'https://pierceology.github.io/fleet-assets/newtv/icon-180.png';
+          const metas = [
+            ['apple-mobile-web-app-capable','yes'],
+            ['mobile-web-app-capable','yes'],
+            ['apple-mobile-web-app-status-bar-style','black-translucent'],
+            ['apple-mobile-web-app-title','NEW TV'],
+            ['theme-color','#05060A']
+          ];
+          metas.forEach(function(pair){
+            if (document.querySelector('meta[name="'+pair[0]+'"]')) return;
+            const m = document.createElement('meta');
+            m.name = pair[0]; m.content = pair[1];
+            document.head.appendChild(m);
+          });
+          if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+            const l = document.createElement('link');
+            l.rel = 'apple-touch-icon'; l.href = ICON;
+            document.head.appendChild(l);
+          }
+        })();
+        if (!fsSupported || isIOS) { $id('rotFull').textContent = 'WATCH WIDE'; }
+        if (isIOS && !standalone) {
+          $id('iosTip').innerHTML =
+            'For true fullscreen on iPhone: tap <b>Share</b>, then <b>Add to Home Screen</b>, and open NEW TV from there.';
+        }
+        ['resize','orientationchange'].forEach(function(ev){ window.addEventListener(ev, checkRotate); });
+        checkRotate();
         $id('btnMute').addEventListener('click',e=>{
           vid.muted=!vid.muted; e.target.textContent='SOUND: '+(vid.muted?'OFF':'ON');});
         
